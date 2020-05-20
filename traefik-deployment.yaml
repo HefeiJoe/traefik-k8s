@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: traefik-ingress-controller
+
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: traefik
+  labels:
+    app: traefik
+
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: traefik
+  template:
+    metadata:
+      labels:
+        app: traefik
+    spec:
+      serviceAccountName: traefik-ingress-controller
+      containers:
+        - name: traefik
+          image: traefik:v2.0.2
+          args:
+            - --api.insecure
+            - --accesslog
+            - --entrypoints.web.Address=:8000
+            - --entrypoints.websecure.Address=:8443
+            - --entryPoints.metrics.address=:8082
+            - --entryPoints.redis.address=:6379
+            - --providers.kubernetescrd
+            - --certificatesresolvers.default.acme.tlschallenge
+            - --certificatesresolvers.default.acme.email=foo@you.com
+            - --certificatesresolvers.default.acme.storage=acme.json
+            - --providers.kubernetesingress=true
+            - --metrics.prometheus=true
+            - --metrics.prometheus.buckets=5.000000
+            - --metrics.prometheus.entryPoint=metrics
+            - --providers.kubernetesingress.ingressclass=traefik
+            #- --tracing.zipkin=true
+            #- --tracing.zipkin.httpEndpoint=http://172.21.92.140/api/v2/spans 
+            #- --tracing.zipkin.sameSpan=true
+            #- --tracing.zipkin.sampleRate=1.0
+            - --tracing.jaeger=true
+            - --tracing.jaeger.samplingServerURL=http://10.233.37.197:5778/sampling
+            - --tracing.jaeger.samplingParam=1.0
+            - --tracing.jaeger.localAgentHostPort=10.233.37.197:6831
+            # Please note that this is the staging Let's Encrypt server.
+            # Once you get things working, you should remove that whole line altogether.
+            - --certificatesresolvers.default.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
+          ports:
+            - name: web
+              containerPort: 8000
+            - name: websecure
+              containerPort: 8443
+            - name: admin
+              containerPort: 8080
+            - name: prometheus
+              containerPort: 8082
+            - name: redis
+              containerPort: 6379
